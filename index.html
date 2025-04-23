@@ -2,94 +2,91 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>שליחה קולית ל-GPT – Botli</title>
+  <title>Botli – האזנה רציפה ותשלוח אוטומטית</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      direction: rtl;
-      padding: 40px;
-    }
-    button {
-      font-size: 20px;
-      padding: 10px 20px;
-      margin: 20px;
-    }
-    #recognizedText {
-      font-size: 24px;
-      margin-top: 30px;
-    }
+    body { font-family: sans-serif; direction: rtl; text-align: center; padding: 40px; }
+    h1 { font-size: 28px; }
+    #status, #transcription { font-size: 20px; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>🎤 GPT – Botli שליחה קולית</h1>
-
-  <button id="toggleRecord">התחל הקלטה 🎤</button>
-  <div id="recognizedText">טקסט מזוה: ...</div>
+  <h1>🎤 Botli – אזנה קולית רציפה בעברית</h1>
+  <div id="status">מאזין...</div>
+  <div id="transcription">תוצאות יופיו כאן ויפורסמו</div>
 
   <script>
     let mediaRecorder;
     let audioChunks = [];
     let isRecording = false;
-    let stream;
 
-    const recordBtn = document.getElementById("toggleRecord");
-    const recognizedText = document.getElementById("recognizedText");
+    async function initContinuousRecording() {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const context = new AudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const processor = context.createScriptProcessor(2048, 1, 1);
 
-    recordBtn.addEventListener("click", async () => {
-      if (!isRecording) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      source.connect(processor);
+      processor.connect(context.destination);
 
-        mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
+        document.getElementById('status').textContent = '⬛ שולח ל-Whisper...';
 
-        mediaRecorder.ondataavailable = event => {
-          audioChunks.push(event.data);
-        };
+        const formData = new FormData();
+        formData.append("file", blob, "audio.webm");
 
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-          const formData = new FormData();
-          formData.append("file", audioBlob, "recording.webm");
-
-          recognizedText.innerText = "שולח ל-Whisper...";
-
-          try {
-            const response = await fetch("http://localhost:5000/transcribe", {
-              method: "POST",
-              body: formData,
-            });
-
-            const data = await response.json();
-            recognizedText.innerText = טקסט מזוה + ": " + (data.text || "שגיאה בזיהוי קול");
-          } catch (error) {
-            recognizedText.innerText = "שגיאה בשליחה: " + error.message;
-          }
-
-          if (isRecording) {
-            startContinuousRecording();
-          }
-        };
-
-        isRecording = true;
-        recordBtn.innerText = "הפסק הקלטה ⛔";
-        startContinuousRecording();
-
-      } else {
-        isRecording = false;
-        recordBtn.innerText = "התחל הקלטה 🎤";
-        stream.getTracks().forEach(track => track.stop());
-      }
-    });
-
-    function startContinuousRecording() {
-      mediaRecorder.start();
-      setTimeout(() => {
-        if (mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
+        try {
+          const res = await fetch("http://localhost:5000/transcribe", {
+            method: "POST",
+            body: formData
+          });
+          const data = await res.json();
+          document.getElementById("transcription").textContent = "📝 " + (data.text || '[שגיאה בזיהוי]');
+        } catch (e) {
+          document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
-      }, 5000); // כל 5 שניות שליחה לשרת
+
+        if (isRecording) {
+          startListening();
+        }
+      };
+
+      let silenceCounter = 0;
+      processor.onaudioprocess = e => {
+        const input = e.inputBuffer.getChannelData(0);
+        const isSilent = input.every(sample => Math.abs(sample) < 0.01);
+
+        if (!isSilent && !isRecording) {
+          document.getElementById("status").textContent = "🔴 מקליט...";
+          isRecording = true;
+          mediaRecorder.start();
+        }
+
+        if (isRecording && isSilent) {
+          silenceCounter++;
+          if (silenceCounter > 20) {
+            document.getElementById("status").textContent = "⬛ עוצר הקלטה...";
+            isRecording = false;
+            silenceCounter = 0;
+            mediaRecorder.stop();
+          }
+        } else if (!isSilent) {
+          silenceCounter = 0;
+        }
+      };
     }
+
+    function startListening() {
+      document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
+    }
+
+    initContinuousRecording();
   </script>
 </body>
 </html>
