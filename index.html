@@ -41,7 +41,7 @@
         audioChunks = [];
 
         if (blob.size < 2000 || recordingDuration < 1500) {
-          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
+          document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או לא מזוה)";
           if (isRecording) startListening();
           return;
         }
@@ -51,7 +51,7 @@
         recentRMS = [];
 
         if (averageRMS > 0.01 && averageRMS < 0.05 && stdDev < 0.005) {
-          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (רעשים לא מובנים)";
+          document.getElementById("transcription").textContent = "📝 טקסט מזוה: (רעשים לא מובנים)";
           if (isRecording) startListening();
           return;
         }
@@ -71,28 +71,28 @@
 
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
-
+          const cleanNormalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
-const cleanText = text.trim();
-const isProbablySilence = (
-  !text ||
-  genericResponses.includes(text) ||
-  normalized.length === 0 ||
-  /^(תודה|thank)/i.test(normalized) ||
-  (normalized.length < 3 && !allowedShortWords.includes(cleanText))
-);
+
+          const isProbablySilence = (
+            !text ||
+            genericResponses.includes(text) ||
+            normalized.length === 0 ||
+            /^(תודה|thank)/i.test(normalized) ||
+            (normalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
+          );
 
           if (isProbablySilence) {
-            document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
+            document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או לא מזוה)";
           } else {
-            document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + text;
+            document.getElementById("transcription").textContent = "📝 טקסט מזוה: " + text;
           }
         } catch (e) {
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
 
         isRecording = false;
-startListening();
+        startListening();
       };
 
       let silenceCounter = 0;
@@ -126,14 +126,14 @@ startListening();
     }
 
     function startListening() {
-  document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
-  if (!isRecording) {
-    recordStartTime = 0;
-    mediaRecorder.start();
-    isRecording = true;
-    document.getElementById("status").textContent = "🔴 מקליט...";
-  }
-}
+      document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
+      if (!isRecording) {
+        recordStartTime = 0;
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById("status").textContent = "🔴 מקליט...";
+      }
+    }
 
     initContinuousRecording();
   </script>
