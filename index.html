@@ -1,76 +1,67 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <meta charset="UTF-8">
-  <title>Botli – שליחה קולית ל-GPT</title>
+  <meta charset="UTF-8" />
+  <title>שליחה קולית ל-GPT – Botli</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; direction: rtl; }
-    button { font-size: 1.2em; padding: 10px 20px; margin: 20px; }
-    #transcription { font-size: 1.2em; color: #333; margin-top: 20px; }
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    button { padding: 10px 20px; font-size: 18px; cursor: pointer; }
+    #result, #finalText { margin-top: 30px; font-size: 20px; }
   </style>
 </head>
 <body>
-  <h1>שליחה קולית ל-GPT – Botli 🎤</h1>
-  <button onclick="startRecording()">התחל הקלטה 🎤</button>
-  <div id="transcription">…</div>
+  <h1>🎤 GPT – Botli שליחה קולית</h1>
+  <button id="recordButton">התחל הקלטה 🎤</button>
+  <div id="result">שולח ל-Whisper...</div>
+  <div id="finalText">טקסט מזוה: <span id="transcript">...</span></div>
 
   <script>
     let mediaRecorder;
-    let audioChunks = [];
+    let chunks = [];
+    const recordButton = document.getElementById('recordButton');
+    const resultDiv = document.getElementById('result');
+    const transcriptSpan = document.getElementById('transcript');
 
-    async function startRecording() {
-      document.getElementById("transcription").textContent = "שולח ל-Whisper...…";
+    recordButton.addEventListener('click', async () => {
+      chunks = []; // reset before each recording
+      transcriptSpan.textContent = '...';
+      resultDiv.textContent = 'שולח ל-Whisper...';
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
 
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const transcript = await sendToWhisper(audioBlob);
-          if (transcript) {
-            document.getElementById("transcription").textContent = "📋 טקסט מזוהה: " + transcript;
-          }
-        };
-
-        mediaRecorder.start();
-
-        setTimeout(() => {
-          mediaRecorder.stop();
-        }, 4000);
-
-      } catch (err) {
-        console.error('Microphone error:', err);
-        document.getElementById("transcription").textContent = "שגיאה בהקלטה קול.";
-      }
-    }
-
-    async function sendToWhisper(audioBlob) {
-      const formData = new FormData();
-      formData.append("file", audioBlob, "recording.webm");
-
-      try {
-        const response = await fetch("http://localhost:5000/transcribe", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Whisper error: ${response.status} ${response.statusText}`);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
         }
+      };
 
-        const data = await response.json();
-        console.log("Whisper result:", data);
-        return data.text || data.transcription || "לא התקבל טקסט";
-      } catch (error) {
-        console.error("Whisper request failed:", error);
-        document.getElementById("transcription").textContent = "❌ שגיאה בזיהוי קול.";
-        return null;
-      }
-    }
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        chunks = []; // reset after stop to avoid multiple appends
+
+        const formData = new FormData();
+        formData.append('file', blob, 'recording.webm');
+
+        try {
+          const response = await fetch('http://localhost:5000/transcribe', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await response.json();
+          console.log('Whisper result:', data);
+
+          transcriptSpan.textContent = data.text || '[No Text Returned]';
+        } catch (err) {
+          console.error('Error sending to Whisper:', err);
+          transcriptSpan.textContent = '[חשב בשלי9]';
+        }
+      };
+
+      mediaRecorder.start();
+      setTimeout(() => mediaRecorder.stop(), 5000); // stop after 5 seconds
+    });
   </script>
 </body>
 </html>
