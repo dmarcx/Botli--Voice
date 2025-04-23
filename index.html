@@ -73,12 +73,13 @@
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
 
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
+const cleanText = text.trim();
 const isProbablySilence = (
   !text ||
   genericResponses.includes(text) ||
   normalized.length === 0 ||
   /^(תודה|thank)/i.test(normalized) ||
-  (normalized.length < 3 && !allowedShortWords.includes(normalized))
+  (normalized.length < 3 && !allowedShortWords.includes(cleanText))
 );
 
           if (isProbablySilence) {
