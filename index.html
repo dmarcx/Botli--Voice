@@ -1,94 +1,109 @@
 <!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>בדיקת זיהוי קול</title>
+  <title>Botli Voice GPT</title>
   <style>
-    body { font-family: Arial; text-align: center; margin-top: 50px; }
-    #levelBar {
-      width: 300px; height: 20px; background: #ddd;
-      margin: 10px auto; border-radius: 10px;
-      overflow: hidden; position: relative;
+    body { font-family: sans-serif; text-align: center; padding: 2em; direction: rtl; }
+    #startBtn { font-size: 1.5em; padding: 0.5em 2em; }
+    #result { margin-top: 2em; font-size: 1.2em; color: #333; }
+    #volumeMeter {
+      width: 300px;
+      height: 20px;
+      background: #eee;
+      margin: 1em auto;
+      border-radius: 10px;
+      overflow: hidden;
     }
-    #level {
-      height: 100%; width: 0; background: green;
-      transition: width 0.1s linear;
+    #volumeLevel {
+      height: 100%;
+      width: 0%;
+      background: green;
     }
-    #log { margin-top: 30px; font-size: 1.2em; }
   </style>
 </head>
 <body>
-  <h1>🎙️ זיהוי קול רציף עם מד עוצמה</h1>
-  <div id="levelBar"><div id="level"></div></div>
-  <button onclick="startListening()">התחל האזנה</button>
-  <button onclick="stopListening()">עצור</button>
-  <div id="log">מוכן להאזנה...</div>
+  <h1>Botli 🗣️ מזהה קול</h1>
+  <button id="startBtn">🎙️ התחל האזנה</button>
+  <div id="volumeMeter"><div id="volumeLevel"></div></div>
+  <div id="result">מחכה לקלט קולי...</div>
 
   <script>
-    let audioContext, analyser, microphone, javascriptNode;
-    let recognition, isRecognizing = false;
+    const startBtn = document.getElementById('startBtn');
+    const resultDiv = document.getElementById('result');
+    const volumeLevel = document.getElementById('volumeLevel');
+
+    let audioContext;
+    let micStream;
+    let analyser;
+    let dataArray;
+    let speechRecognition;
+    let vadThreshold = 20;
     let silenceTimeout;
 
-    function startListening() {
-      if (isRecognizing) return;
-      document.getElementById("log").textContent = "מאזין...";
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          analyser = audioContext.createAnalyser();
-          microphone = audioContext.createMediaStreamSource(stream);
-          javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+    function updateVolumeMeter() {
+      if (!analyser) return;
 
-          analyser.smoothingTimeConstant = 0.8;
-          analyser.fftSize = 1024;
+      analyser.getByteFrequencyData(dataArray);
+      let volume = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      volumeLevel.style.width = Math.min(volume, 100) + '%';
 
-          microphone.connect(analyser);
-          analyser.connect(javascriptNode);
-          javascriptNode.connect(audioContext.destination);
+      if (volume > vadThreshold) {
+        startRecognition();
+        clearTimeout(silenceTimeout);
+      } else {
+        silenceTimeout = setTimeout(() => {
+          stopRecognition();
+        }, 2500);
+      }
 
-          javascriptNode.onaudioprocess = () => {
-            const array = new Uint8Array(analyser.frequencyBinCount);
-            analyser.getByteFrequencyData(array);
-            const volume = array.reduce((a, b) => a + b) / array.length;
-            document.getElementById("level").style.width = Math.min(volume, 100) + "%";
-            if (volume > 20) triggerRecognition();
-          };
-        });
+      requestAnimationFrame(updateVolumeMeter);
     }
 
-    function stopListening() {
-      isRecognizing = false;
-      if (recognition) recognition.stop();
-      if (audioContext) audioContext.close();
-      document.getElementById("log").textContent = "נעצר";
+    function startAudioProcessing() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        micStream = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        micStream.connect(analyser);
+        updateVolumeMeter();
+      }).catch(err => {
+        console.error('🎤 לא הצלחנו לגשת למיקרופון:', err);
+      });
     }
 
-    function triggerRecognition() {
-      if (isRecognizing) return;
-      isRecognizing = true;
-      document.getElementById("log").textContent = "🎤 מזהה דיבור...";
+    function startRecognition() {
+      if (speechRecognition && speechRecognition.recognizing) return;
+      speechRecognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      speechRecognition.lang = 'he-IL';
+      speechRecognition.interimResults = false;
 
-      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'he-IL';
-      recognition.interimResults = false;
-
-      recognition.onresult = event => {
+      speechRecognition.onresult = event => {
         const text = event.results[0][0].transcript;
-        document.getElementById("log").textContent = "✅ זוהה: " + text;
+        resultDiv.textContent = '🔊 זיהוי: ' + text;
       };
 
-      recognition.onend = () => {
-        isRecognizing = false;
-        document.getElementById("log").textContent += " | מוכן להאזנה...";
+      speechRecognition.onend = () => {
+        speechRecognition.recognizing = false;
       };
 
-      recognition.onerror = () => {
-        isRecognizing = false;
-        document.getElementById("log").textContent = "❌ שגיאת זיהוי";
-      };
-
-      recognition.start();
+      speechRecognition.start();
+      speechRecognition.recognizing = true;
     }
+
+    function stopRecognition() {
+      if (speechRecognition && speechRecognition.recognizing) {
+        speechRecognition.stop();
+        speechRecognition.recognizing = false;
+      }
+    }
+
+    startBtn.onclick = () => {
+      resultDiv.textContent = '🎧 מאזין...';
+      startAudioProcessing();
+    };
   </script>
 </body>
 </html>
