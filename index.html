@@ -91,9 +91,8 @@ const isProbablySilence = (
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
 
-        if (isRecording) {
-          startListening();
-        }
+        isRecording = false;
+startListening();
       };
 
       let silenceCounter = 0;
