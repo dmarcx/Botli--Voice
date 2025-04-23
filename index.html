@@ -2,112 +2,75 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli Whisper-GPT-TTS</title>
+  <title>Botli – שליחה קולית ל-GPT</title>
   <style>
-    body { font-family: sans-serif; text-align: center; direction: rtl; padding: 2em; }
-    button { font-size: 1.2em; padding: 10px 20px; margin: 10px; }
-    #status { font-size: 1.3em; margin: 20px; }
-    #transcript { font-size: 1.4em; margin-top: 20px; color: #333; }
-    #wave { width: 300px; height: 10px; background: #eee; margin: 0 auto; }
-    #level { height: 100%; width: 0%; background: green; }
+    body { font-family: Arial, sans-serif; text-align: center; direction: rtl; }
+    button { font-size: 1.2em; padding: 10px 20px; margin: 20px; }
+    #transcription { font-size: 1.2em; color: #333; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>🎙️ Botli – שליחה קולית ל-GPT</h1>
-  <button id="recordBtn">🎤 התחל הקלטה</button>
-  <div id="status">מוכן...</div>
-  <div id="wave"><div id="level"></div></div>
-  <div id="transcript">...</div>
+  <h1>שליחה קולית ל-GPT – Botli 🎤</h1>
+  <button onclick="startRecording()">התחל הקלטה 🎤</button>
+  <div id="transcription">…</div>
 
   <script>
-    const recordBtn = document.getElementById("recordBtn");
-    const status = document.getElementById("status");
-    const transcriptDiv = document.getElementById("transcript");
-    const levelBar = document.getElementById("level");
-
     let mediaRecorder;
     let audioChunks = [];
-    let audioContext;
-    let analyser;
-    let source;
-    let rafId;
 
-    function visualizeMic(stream) {
-      audioContext = new AudioContext();
-      source = audioContext.createMediaStreamSource(stream);
-      analyser = audioContext.createAnalyser();
-      source.connect(analyser);
-      const dataArray = new Uint8Array(analyser.fftSize);
+    async function startRecording() {
+      document.getElementById("transcription").textContent = "שולח ל-Whisper...…";
 
-      function draw() {
-        analyser.getByteTimeDomainData(dataArray);
-        const max = Math.max(...dataArray);
-        const percent = ((max - 128) / 128) * 100;
-        levelBar.style.width = Math.min(Math.abs(percent), 100) + "%";
-        rafId = requestAnimationFrame(draw);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const transcript = await sendToWhisper(audioBlob);
+          if (transcript) {
+            document.getElementById("transcription").textContent = "📋 טקסט מזוהה: " + transcript;
+          }
+        };
+
+        mediaRecorder.start();
+
+        setTimeout(() => {
+          mediaRecorder.stop();
+        }, 4000);
+
+      } catch (err) {
+        console.error('Microphone error:', err);
+        document.getElementById("transcription").textContent = "שגיאה בהקלטה קול.";
       }
-      draw();
     }
 
-    async function sendToWhisper(blob) {
-      status.textContent = "🎧 שולח ל-Whisper...";
+    async function sendToWhisper(audioBlob) {
       const formData = new FormData();
-      formData.append("audio", blob, "audio.webm");
+      formData.append("file", audioBlob, "recording.webm");
 
-      const res = await fetch("http://localhost:5000/transcribe", {
-        method: "POST",
-        body: formData
-      });
+      try {
+        const response = await fetch("http://localhost:5000/transcribe", {
+          method: "POST",
+          body: formData,
+        });
 
-      const data = await res.json();
-      const text = data.text;
-      transcriptDiv.textContent = "📜 טקסט מזוהה: " + text;
+        if (!response.ok) {
+          throw new Error(`Whisper error: ${response.status} ${response.statusText}`);
+        }
 
-      status.textContent = "📨 שולח ל-GPT...";
-      const gptRes = await fetch("http://localhost:3080/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text })
-      });
-
-      const gptData = await gptRes.json();
-      const reply = gptData.response;
-      status.textContent = "🤖 GPT ענה: " + reply;
-      speak(reply);
-    }
-
-    function speak(text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "he-IL";
-      speechSynthesis.speak(utterance);
-    }
-
-    recordBtn.onclick = async () => {
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        status.textContent = "🛑 עוצר הקלטה...";
-        cancelAnimationFrame(rafId);
-        return;
+        const data = await response.json();
+        console.log("Whisper result:", data);
+        return data.text || data.transcription || "לא התקבל טקסט";
+      } catch (error) {
+        console.error("Whisper request failed:", error);
+        document.getElementById("transcription").textContent = "❌ שגיאה בזיהוי קול.";
+        return null;
       }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      visualizeMic(stream);
-
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        audioChunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-        sendToWhisper(audioBlob);
-      };
-
-      mediaRecorder.start();
-      status.textContent = "🎙️ מקליט... לחץ שוב לעצירה";
-    };
+    }
   </script>
 </body>
 </html>
