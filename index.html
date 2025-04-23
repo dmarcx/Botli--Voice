@@ -2,18 +2,18 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli - זיהוי קולי עם תגובה קולית</title>
+  <title>Botli - זיהוי קולי מתמשך</title>
   <style>
-    body { font-family: Arial; direction: rtl; text-align: center; margin: 50px; }
-    button { font-size: 20px; margin: 10px; padding: 10px 20px; }
-    #output { margin-top: 30px; font-size: 24px; white-space: pre-line; }
+    body { font-family: sans-serif; direction: rtl; text-align: center; padding: 2em; }
+    #output { white-space: pre-wrap; background: #f9f9f9; padding: 1em; margin-top: 1em; border-radius: 8px; }
+    button { font-size: 1.2em; margin: 1em; padding: 0.5em 1.5em; }
   </style>
 </head>
 <body>
-  <h1>🎙️ Botli - האזנה קבועה עם תגובה קולית</h1>
+  <h1>🎤 Botli - האזנה מתמשכת</h1>
   <button onclick="startRecognition()">🚀 התחל</button>
-  <button onclick="stopRecognition()">🛑 עצור</button>
-  <div id="output"></div>
+  <button onclick="stopRecognition()">⛔ עצור</button>
+  <div id="output">מוכן להתחיל האזנה...</div>
 
   <script>
     const output = document.getElementById("output");
@@ -22,26 +22,32 @@
     recognition.interimResults = false;
     recognition.continuous = false;
 
+    let isListening = false;
+
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript.trim();
-      output.innerHTML += "🎙️ " + text + "\n";
+      output.innerHTML += `\n🎙️ ${text}`;
       speak(text);
     };
 
     recognition.onend = () => {
-      if (isListening) recognition.start();
+      if (isListening) {
+        output.innerHTML += "\n🔁 מאזין שוב...";
+        recognition.start(); // ריסט
+      }
     };
 
     recognition.onerror = (event) => {
-      output.innerHTML += "⚠️ שגיאה: " + event.error + "\n";
+      output.innerHTML += `\n⚠️ שגיאה: ${event.error}`;
+      if (isListening && event.error === "no-speech") {
+        setTimeout(() => recognition.start(), 500); // נסה שוב אחרי חצי שנייה
+      }
     };
-
-    let isListening = false;
 
     function startRecognition() {
       if (!isListening) {
         isListening = true;
-        output.innerHTML += "🎧 מוכן להאזנה...\n";
+        output.innerHTML += "\n▶️ התחלה מחדש.";
         recognition.start();
       }
     }
@@ -49,20 +55,24 @@
     function stopRecognition() {
       isListening = false;
       recognition.stop();
-      output.innerHTML += "⛔ הופסקה ההאזנה.\n";
+      output.innerHTML += "\n⛔ הופסקה ההאזנה.";
     }
 
     function speak(text) {
       const msg = new SpeechSynthesisUtterance(text);
-      const voices = speechSynthesis.getVoices();
       msg.lang = "he-IL";
-      const hebrewVoice = voices.find(voice => voice.lang === "he-IL");
-      if (hebrewVoice) msg.voice = hebrewVoice;
+      const voices = speechSynthesis.getVoices();
+      const hebVoice = voices.find(v => v.lang === "he-IL");
+      if (hebVoice) msg.voice = hebVoice;
+      msg.rate = 1;
+      msg.volume = 1;
+      speechSynthesis.cancel(); // תור קולי
       speechSynthesis.speak(msg);
     }
 
-    // טוען את הקולות מראש (לעיתים צריך להריץ פעם אחת כדי לקבל קול עברי)
-    window.speechSynthesis.onvoiceschanged = () => {};
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => {};
+    }
   </script>
 </body>
 </html>
