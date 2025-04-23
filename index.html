@@ -37,7 +37,6 @@
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
 
-        // סינון שקטים או הקלטות קצרות מאוד
         if (blob.size < 2000) {
           document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
           if (isRecording) startListening();
@@ -55,7 +54,14 @@
             body: formData
           });
           const data = await res.json();
-          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + (data.text || '[שגיאה בזיהוי]');
+          const text = (data.text || '').trim();
+
+          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך"];
+          if (!text || genericResponses.includes(text)) {
+            document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
+          } else {
+            document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + text;
+          }
         } catch (e) {
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
