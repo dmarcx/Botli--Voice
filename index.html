@@ -2,52 +2,37 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli - האזנה קבועה עם תגובה קולית</title>
+  <title>Botli - האזנה מתמשכת</title>
   <style>
-    body { font-family: sans-serif; direction: rtl; text-align: center; padding: 2em; }
-    #output { white-space: pre-wrap; background: #f9f9f9; padding: 1em; margin-top: 1em; border-radius: 8px; }
-    button { font-size: 1.2em; margin: 1em; padding: 0.5em 1.5em; }
+    body { font-family: Arial, sans-serif; direction: rtl; text-align: center; padding: 2em; }
+    #log { background: #f0f0f0; padding: 1em; border-radius: 10px; margin-top: 1em; white-space: pre-wrap; }
+    button { font-size: 1.2em; padding: 0.5em 1.5em; margin: 0.5em; }
   </style>
 </head>
 <body>
-  <h1>🎤 Botli - האזנה קבועה עם תגובה קולית</h1>
+  <h1>🎤 Botli - האזנה מתמשכת</h1>
   <button onclick="startRecognition()">🚀 התחל</button>
   <button onclick="stopRecognition()">⛔ עצור</button>
-  <div id="output">🎧 מוכן להאזנה...</div>
+  <div id="log">מוכן להתחיל האזנה...</div>
 
   <script>
-    const output = document.getElementById("output");
+    const logDiv = document.getElementById("log");
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "he-IL";
-    recognition.interimResults = false;
     recognition.continuous = false;
+    recognition.interimResults = false;
 
     let isListening = false;
     let isSpeaking = false;
 
-    recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript.trim();
-      output.innerHTML += `\n🎙️ ${text}`;
-      respond(text);
-    };
-
-    recognition.onend = () => {
-      if (isListening && !isSpeaking) {
-        recognition.start(); // המשך להאזין
-      }
-    };
-
-    recognition.onerror = (event) => {
-      output.innerHTML += `\n⚠️ שגיאה: ${event.error}`;
-      if (isListening && event.error === "no-speech") {
-        setTimeout(() => recognition.start(), 800);
-      }
-    };
+    function log(msg) {
+      logDiv.innerText += "\n" + msg;
+    }
 
     function startRecognition() {
       if (!isListening) {
         isListening = true;
-        output.innerHTML += "\n▶️ התחלה...";
+        log("▶️ התחלה מחדש.");
         recognition.start();
       }
     }
@@ -55,24 +40,47 @@
     function stopRecognition() {
       isListening = false;
       recognition.stop();
-      output.innerHTML += "\n⛔ הופסקה ההאזנה.";
+      log("⛔ הופסקה ההאזנה.");
     }
 
-    function respond(text) {
+    recognition.onresult = (event) => {
+      if (isSpeaking) {
+        log("🔁 מדלג על תוצאה בזמן דיבור.");
+        return;
+      }
+      const text = event.results[0][0].transcript.trim();
+      log(`🎙️ ${text}`);
+      speak(text);
+    };
+
+    recognition.onend = () => {
+      if (isListening && !isSpeaking) {
+        recognition.start();
+        log("🔄 מאזין שוב...");
+      }
+    };
+
+    recognition.onerror = (event) => {
+      log(`⚠️ שגיאה: ${event.error}`);
+      if (isListening && event.error === "no-speech") {
+        setTimeout(() => recognition.start(), 800);
+      }
+    };
+
+    function speak(text) {
       isSpeaking = true;
       const msg = new SpeechSynthesisUtterance(text);
       msg.lang = "he-IL";
+      msg.onend = () => {
+        isSpeaking = false;
+        if (isListening) recognition.start();
+      };
 
       const voices = speechSynthesis.getVoices();
       const hebVoice = voices.find(v => v.lang === "he-IL");
       if (hebVoice) msg.voice = hebVoice;
 
-      msg.onend = () => {
-        isSpeaking = false;
-        if (isListening) recognition.start(); // חזרה להאזנה אחרי שדיברנו
-      };
-
-      speechSynthesis.cancel();
+      speechSynthesis.cancel();  // לעצור דיבור קודם אם קיים
       speechSynthesis.speak(msg);
     }
 
