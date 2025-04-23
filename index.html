@@ -18,6 +18,7 @@
     let mediaRecorder;
     let audioChunks = [];
     let isRecording = false;
+    let recentRMS = [];
 
     async function initContinuousRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -39,6 +40,14 @@
 
         if (blob.size < 2000) {
           document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
+          if (isRecording) startListening();
+          return;
+        }
+
+        const averageRMS = recentRMS.reduce((a, b) => a + b, 0) / recentRMS.length;
+        recentRMS = [];
+        if (averageRMS > 0.01 && averageRMS < 0.05) {
+          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (רעשים לא מובנים)";
           if (isRecording) startListening();
           return;
         }
@@ -84,6 +93,9 @@
       processor.onaudioprocess = e => {
         const input = e.inputBuffer.getChannelData(0);
         const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
+        recentRMS.push(rms);
+        if (recentRMS.length > 30) recentRMS.shift();
+
         const isSilent = rms < 0.01;
 
         if (!isSilent && !isRecording) {
