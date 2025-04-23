@@ -19,6 +19,7 @@
     let audioChunks = [];
     let isRecording = false;
     let recentRMS = [];
+    let recordStartTime = 0;
 
     async function initContinuousRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -35,18 +36,21 @@
       };
 
       mediaRecorder.onstop = async () => {
+        const recordingDuration = Date.now() - recordStartTime;
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
 
-        if (blob.size < 2000) {
+        if (blob.size < 2000 || recordingDuration < 1500) {
           document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
           if (isRecording) startListening();
           return;
         }
 
         const averageRMS = recentRMS.reduce((a, b) => a + b, 0) / recentRMS.length;
+        const stdDev = Math.sqrt(recentRMS.map(x => Math.pow(x - averageRMS, 2)).reduce((a, b) => a + b, 0) / recentRMS.length);
         recentRMS = [];
-        if (averageRMS > 0.01 && averageRMS < 0.05) {
+
+        if (averageRMS > 0.01 && averageRMS < 0.05 && stdDev < 0.005) {
           document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (רעשים לא מובנים)";
           if (isRecording) startListening();
           return;
@@ -101,6 +105,7 @@
         if (!isSilent && !isRecording) {
           document.getElementById("status").textContent = "🔴 מקליט...";
           isRecording = true;
+          recordStartTime = Date.now();
           mediaRecorder.start();
         }
 
