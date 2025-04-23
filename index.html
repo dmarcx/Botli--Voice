@@ -1,33 +1,67 @@
-
 <!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>Botli - זיהוי קולי בעברית</title>
+  <meta charset="UTF-8">
+  <title>Botli - זיהוי קולי מתמשך</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    button { font-size: 18px; padding: 10px 20px; margin: 10px; }
+    #output { font-size: 20px; margin-top: 30px; color: #333; }
+  </style>
 </head>
 <body>
-    <h1>🎤 Botli - זיהוי קולי בעברית</h1>
-    <button onclick="startRecognition()">התחל זיהוי</button>
-    <button onclick="stopRecognition()">עצור זיהוי</button>
-    <p id="result">תוצאה: ...</p>
+  <h1>🎤 Botli - זיהוי קולי מתמשך</h1>
+  <button onclick="startRecognition()">התחל זיהוי</button>
+  <button onclick="stopRecognition()">עצור זיהוי</button>
+  <div id="output">מוכן להאזנה...</div>
 
-    <script>
-        var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = "he-IL";
-        recognition.continuous = false;
-        recognition.interimResults = false;
+  <script>
+    let recognition;
+    let isListening = false;
 
-        recognition.onresult = function(event) {
-            document.getElementById("result").innerText = "תוצאה: " + event.results[0][0].transcript;
-        };
+    function startRecognition() {
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        alert("הדפדפן שלך לא תומך בזיהוי קולי.");
+        return;
+      }
 
-        function startRecognition() {
-            recognition.start();
+      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'he-IL';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        document.getElementById('output').textContent = "🎧 מאזין...";
+      };
+
+      recognition.onresult = (event) => {
+        let text = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          text += event.results[i][0].transcript + ' ';
         }
+        document.getElementById('output').textContent = '🗣️ תוצאה: ' + text.trim();
+      };
 
-        function stopRecognition() {
-            recognition.stop();
+      recognition.onerror = (event) => {
+        console.error("שגיאה בזיהוי:", event.error);
+        document.getElementById('output').textContent = '⚠️ שגיאה: ' + event.error;
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          recognition.start(); // האזנה מתחדשת אוטומטית
         }
-    </script>
+      };
+
+      recognition.start();
+    }
+
+    function stopRecognition() {
+      isListening = false;
+      if (recognition) recognition.stop();
+      document.getElementById('output').textContent = "⏹️ האזנה הופסקה.";
+    }
+  </script>
 </body>
 </html>
