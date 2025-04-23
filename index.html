@@ -73,11 +73,12 @@
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
 
           const isProbablySilence = (
-            !text ||
-            genericResponses.includes(text) ||
-            normalized.length < 3 ||
-            /^(תודה|thank)/i.test(text)
-          );
+  !text ||
+  genericResponses.includes(text) ||
+  normalized.length < 3 ||
+  /^(תודה|thank)/i.test(text) ||
+  !/[֐-׿a-zA-Z]{2,}/.test(text) // לא נמצאו אותיות בעברית או אנגלית בתבנית סבירה
+);
 
           if (isProbablySilence) {
             document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
