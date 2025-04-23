@@ -77,13 +77,8 @@ const isProbablySilence = (
   !text ||
   genericResponses.includes(text) ||
   normalized.length === 0 ||
-  /^(תודה|thank)/i.test(text) ||
+  /^(תודה|thank)/i.test(normalized) ||
   (normalized.length < 3 && !allowedShortWords.includes(normalized))
-  !text ||
-  genericResponses.includes(text) ||
-  normalized.length === 0 ||
-  /^(תודה|thank)/i.test(text) ||
-  (normalized.length < 3 && !allowedShortWords.includes(text))
 );
 
           if (isProbablySilence) {
