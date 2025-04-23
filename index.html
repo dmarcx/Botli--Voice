@@ -1,0 +1,33 @@
+
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <title>Botli - זיהוי קולי בעברית</title>
+</head>
+<body>
+    <h1>🎤 Botli - זיהוי קולי בעברית</h1>
+    <button onclick="startRecognition()">התחל זיהוי</button>
+    <button onclick="stopRecognition()">עצור זיהוי</button>
+    <p id="result">תוצאה: ...</p>
+
+    <script>
+        var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = "he-IL";
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onresult = function(event) {
+            document.getElementById("result").innerText = "תוצאה: " + event.results[0][0].transcript;
+        };
+
+        function startRecognition() {
+            recognition.start();
+        }
+
+        function stopRecognition() {
+            recognition.stop();
+        }
+    </script>
+</body>
+</html>
