@@ -83,7 +83,8 @@
       let silenceCounter = 0;
       processor.onaudioprocess = e => {
         const input = e.inputBuffer.getChannelData(0);
-        const isSilent = input.every(sample => Math.abs(sample) < 0.01);
+        const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
+        const isSilent = rms < 0.01;
 
         if (!isSilent && !isRecording) {
           document.getElementById("status").textContent = "🔴 מקליט...";
