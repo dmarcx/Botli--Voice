@@ -1,62 +1,95 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <meta charset="UTF-8" />
-  <title>Botli – שליחה קולית ל-GPT</title>
+  <meta charset="UTF-8">
+  <title>שליחה קולית ל-GPT – Botli</title>
   <style>
-    body { font-family: sans-serif; direction: rtl; text-align: center; }
-    button { font-size: 1.2em; padding: 10px 20px; margin: 20px; }
-    .mic-icon { font-size: 2em; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      direction: rtl;
+      padding: 40px;
+    }
+    button {
+      font-size: 20px;
+      padding: 10px 20px;
+      margin: 20px;
+    }
+    #recognizedText {
+      font-size: 24px;
+      margin-top: 30px;
+    }
   </style>
 </head>
 <body>
-  <h1>שליחה קולית ל-GPT – <span class="mic-icon">🎤</span> Botli</h1>
-  <button id="recordBtn">התחל הקלטה 🎤</button>
-  <p id="status">...</p>
-  <p><strong>טקסט מזוה:</strong> <span id="result"></span></p>
+  <h1>🎤 GPT – Botli שליחה קולית</h1>
+
+  <button id="toggleRecord">התחל הקלטה 🎤</button>
+  <div id="recognizedText">טקסט מזוה: ...</div>
 
   <script>
-    const recordBtn = document.getElementById('recordBtn');
-    const status = document.getElementById('status');
-    const result = document.getElementById('result');
-
     let mediaRecorder;
-    let chunks = [];
+    let audioChunks = [];
+    let isRecording = false;
+    let stream;
 
-    async function startRecording() {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
+    const recordBtn = document.getElementById("toggleRecord");
+    const recognizedText = document.getElementById("recognizedText");
 
-      mediaRecorder.onstart = () => {
-        status.textContent = '...Whisper-שולח ל';
-        chunks = [];
-      };
+    recordBtn.addEventListener("click", async () => {
+      if (!isRecording) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
 
-      mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        status.textContent = 'שולח ל-GPT...';
+        mediaRecorder.ondataavailable = event => {
+          audioChunks.push(event.data);
+        };
 
-        const formData = new FormData();
-        formData.append('file', blob, 'recording.webm');
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+          const formData = new FormData();
+          formData.append("file", audioBlob, "recording.webm");
 
-        const res = await fetch('http://localhost:5000/transcribe', {
-          method: 'POST',
-          body: formData
-        });
+          recognizedText.innerText = "שולח ל-Whisper...";
 
-        const data = await res.json();
-        console.log('Whisper result:', data);
-        result.textContent = data.text || '[שגיאה]';
-        status.textContent = '...';
-      };
+          try {
+            const response = await fetch("http://localhost:5000/transcribe", {
+              method: "POST",
+              body: formData,
+            });
 
+            const data = await response.json();
+            recognizedText.innerText = טקסט מזוה + ": " + (data.text || "שגיאה בזיהוי קול");
+          } catch (error) {
+            recognizedText.innerText = "שגיאה בשליחה: " + error.message;
+          }
+
+          if (isRecording) {
+            startContinuousRecording();
+          }
+        };
+
+        isRecording = true;
+        recordBtn.innerText = "הפסק הקלטה ⛔";
+        startContinuousRecording();
+
+      } else {
+        isRecording = false;
+        recordBtn.innerText = "התחל הקלטה 🎤";
+        stream.getTracks().forEach(track => track.stop());
+      }
+    });
+
+    function startContinuousRecording() {
       mediaRecorder.start();
-      setTimeout(() => mediaRecorder.stop(), 6000); // 6 שניות
+      setTimeout(() => {
+        if (mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+      }, 5000); // כל 5 שניות שליחה לשרת
     }
-
-    recordBtn.onclick = startRecording;
   </script>
 </body>
 </html>
