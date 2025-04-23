@@ -56,8 +56,10 @@
           const data = await res.json();
           const text = (data.text || '').trim();
 
-          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך"];
-          if (!text || genericResponses.includes(text)) {
+          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "", "Thank you", "Thanks"];
+          const normalized = text.replace(/[.,!?\s]/g, '').toLowerCase();
+
+          if (!text || genericResponses.includes(text) || normalized.length < 3) {
             document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
           } else {
             document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + text;
