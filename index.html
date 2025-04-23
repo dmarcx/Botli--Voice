@@ -126,8 +126,14 @@ const isProbablySilence = (
     }
 
     function startListening() {
-      document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
-    }
+  document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
+  if (!isRecording) {
+    recordStartTime = 0;
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById("status").textContent = "🔴 מקליט...";
+  }
+}
 
     initContinuousRecording();
   </script>
