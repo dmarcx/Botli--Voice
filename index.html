@@ -1,99 +1,62 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <meta charset="UTF-8">
-  <title>Botli Whisper Continuous</title>
+  <meta charset="UTF-8" />
+  <title>Botli – שליחה קולית ל-GPT</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      direction: rtl;
-      margin-top: 50px;
-    }
-    button {
-      font-size: 1.2em;
-      padding: 10px 20px;
-      margin: 20px;
-    }
-    #status {
-      margin-top: 30px;
-      font-size: 1.2em;
-    }
+    body { font-family: sans-serif; direction: rtl; text-align: center; }
+    button { font-size: 1.2em; padding: 10px 20px; margin: 20px; }
+    .mic-icon { font-size: 2em; }
   </style>
 </head>
 <body>
-  <h1>
-    <span style="font-size: 1.3em">🎤</span> Botli – עוזר קולי GPT בשיחה רציפה
-  </h1>
-
-  <div id="status">⬛ מוכן להאזנה...</div>
+  <h1>שליחה קולית ל-GPT – <span class="mic-icon">🎤</span> Botli</h1>
+  <button id="recordBtn">התחל הקלטה 🎤</button>
+  <p id="status">...</p>
+  <p><strong>טקסט מזוה:</strong> <span id="result"></span></p>
 
   <script>
+    const recordBtn = document.getElementById('recordBtn');
+    const status = document.getElementById('status');
+    const result = document.getElementById('result');
+
     let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
+    let chunks = [];
 
-    async function startVAD() {
+    async function startRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const context = new AudioContext();
-      const source = context.createMediaStreamSource(stream);
-      const processor = context.createScriptProcessor(2048, 1, 1);
-
-      source.connect(processor);
-      processor.connect(context.destination);
-
       mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = e => {
-        audioChunks.push(e.data);
+
+      mediaRecorder.onstart = () => {
+        status.textContent = '...Whisper-שולח ל';
+        chunks = [];
       };
+
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        audioChunks = [];
-        await sendToWhisper(audioBlob);
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        status.textContent = 'שולח ל-GPT...';
+
+        const formData = new FormData();
+        formData.append('file', blob, 'recording.webm');
+
+        const res = await fetch('http://localhost:5000/transcribe', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        console.log('Whisper result:', data);
+        result.textContent = data.text || '[שגיאה]';
+        status.textContent = '...';
       };
 
-      let silenceCounter = 0;
-      processor.onaudioprocess = e => {
-        const input = e.inputBuffer.getChannelData(0);
-        const isSilent = input.every(sample => Math.abs(sample) < 0.01);
-
-        if (!isSilent && !isRecording) {
-          document.getElementById('status').innerText = '🔴 מקליט...';
-          isRecording = true;
-          mediaRecorder.start();
-        }
-
-        if (isRecording) {
-          if (isSilent) {
-            silenceCounter++;
-            if (silenceCounter > 15) {
-              document.getElementById('status').innerText = '⬛ שולח ל־Whisper...';
-              mediaRecorder.stop();
-              isRecording = false;
-              silenceCounter = 0;
-            }
-          } else {
-            silenceCounter = 0;
-          }
-        }
-      };
+      mediaRecorder.start();
+      setTimeout(() => mediaRecorder.stop(), 6000); // 6 שניות
     }
 
-    async function sendToWhisper(blob) {
-      const formData = new FormData();
-      formData.append("file", blob, "audio.webm");
-
-      const res = await fetch("http://localhost:5000/transcribe", {
-        method: "POST",
-        body: formData
-      });
-      const data = await res.json();
-      console.log("Whisper result:", data);
-      document.getElementById("status").innerText = `📝 טקסט מזוהה: ${data.text}`;
-    }
-
-    startVAD();
+    recordBtn.onclick = startRecording;
   </script>
 </body>
 </html>
