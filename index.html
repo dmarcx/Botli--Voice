@@ -2,7 +2,7 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli – האזנה רציפה ותשלוח אוטומטית</title>
+  <title>Botli – האזנה רציפה ותמלול אוטומטי</title>
   <style>
     body { font-family: sans-serif; direction: rtl; text-align: center; padding: 40px; }
     h1 { font-size: 28px; }
@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  <h1>🎤 Botli – אזנה קולית רציפה בעברית</h1>
+  <h1>🎤 Botli – האזנה קולית רציפה ל-GPT</h1>
   <div id="status">מאזין...</div>
   <div id="transcription">תוצאות יופיו כאן ויפורסמו</div>
 
@@ -36,7 +36,7 @@
       mediaRecorder.onstop = async () => {
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
-        document.getElementById('status').textContent = '⬛ שולח ל-Whisper...';
+        document.getElementById('status').textContent = "⬛ שולח ל-Whisper...";
 
         const formData = new FormData();
         formData.append("file", blob, "audio.webm");
@@ -47,7 +47,7 @@
             body: formData
           });
           const data = await res.json();
-          document.getElementById("transcription").textContent = "📝 " + (data.text || '[שגיאה בזיהוי]');
+          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + (data.text || '[שגיאה בזיהוי]');
         } catch (e) {
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
