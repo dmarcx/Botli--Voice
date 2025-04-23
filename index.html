@@ -77,7 +77,7 @@
   genericResponses.includes(text) ||
   normalized.length === 0 ||
   /^(תודה|thank)/i.test(text) ||
-  (/[^֐-׿a-zA-Z]/.test(normalized) && normalized.length < 3)
+  (normalized.length < 3 && !['כן','לא','מה'].includes(text))
 );
 
           if (isProbablySilence) {
