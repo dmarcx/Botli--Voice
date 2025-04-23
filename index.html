@@ -1,67 +1,99 @@
 <!DOCTYPE html>
 <html lang="he">
 <head>
-  <meta charset="UTF-8" />
-  <title>שליחה קולית ל-GPT – Botli</title>
+  <meta charset="UTF-8">
+  <title>Botli Whisper Continuous</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-    button { padding: 10px 20px; font-size: 18px; cursor: pointer; }
-    #result, #finalText { margin-top: 30px; font-size: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      direction: rtl;
+      margin-top: 50px;
+    }
+    button {
+      font-size: 1.2em;
+      padding: 10px 20px;
+      margin: 20px;
+    }
+    #status {
+      margin-top: 30px;
+      font-size: 1.2em;
+    }
   </style>
 </head>
 <body>
-  <h1>🎤 GPT – Botli שליחה קולית</h1>
-  <button id="recordButton">התחל הקלטה 🎤</button>
-  <div id="result">שולח ל-Whisper...</div>
-  <div id="finalText">טקסט מזוה: <span id="transcript">...</span></div>
+  <h1>
+    <span style="font-size: 1.3em">🎤</span> Botli – עוזר קולי GPT בשיחה רציפה
+  </h1>
+
+  <div id="status">⬛ מוכן להאזנה...</div>
 
   <script>
     let mediaRecorder;
-    let chunks = [];
-    const recordButton = document.getElementById('recordButton');
-    const resultDiv = document.getElementById('result');
-    const transcriptSpan = document.getElementById('transcript');
+    let audioChunks = [];
+    let isRecording = false;
 
-    recordButton.addEventListener('click', async () => {
-      chunks = []; // reset before each recording
-      transcriptSpan.textContent = '...';
-      resultDiv.textContent = 'שולח ל-Whisper...';
-
+    async function startVAD() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
+      const context = new AudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const processor = context.createScriptProcessor(2048, 1, 1);
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
+      source.connect(processor);
+      processor.connect(context.destination);
+
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => {
+        audioChunks.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        chunks = []; // reset after stop to avoid multiple appends
-
-        const formData = new FormData();
-        formData.append('file', blob, 'recording.webm');
-
-        try {
-          const response = await fetch('http://localhost:5000/transcribe', {
-            method: 'POST',
-            body: formData
-          });
-
-          const data = await response.json();
-          console.log('Whisper result:', data);
-
-          transcriptSpan.textContent = data.text || '[No Text Returned]';
-        } catch (err) {
-          console.error('Error sending to Whisper:', err);
-          transcriptSpan.textContent = '[חשב בשלי9]';
-        }
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        audioChunks = [];
+        await sendToWhisper(audioBlob);
       };
 
-      mediaRecorder.start();
-      setTimeout(() => mediaRecorder.stop(), 5000); // stop after 5 seconds
-    });
+      let silenceCounter = 0;
+      processor.onaudioprocess = e => {
+        const input = e.inputBuffer.getChannelData(0);
+        const isSilent = input.every(sample => Math.abs(sample) < 0.01);
+
+        if (!isSilent && !isRecording) {
+          document.getElementById('status').innerText = '🔴 מקליט...';
+          isRecording = true;
+          mediaRecorder.start();
+        }
+
+        if (isRecording) {
+          if (isSilent) {
+            silenceCounter++;
+            if (silenceCounter > 15) {
+              document.getElementById('status').innerText = '⬛ שולח ל־Whisper...';
+              mediaRecorder.stop();
+              isRecording = false;
+              silenceCounter = 0;
+            }
+          } else {
+            silenceCounter = 0;
+          }
+        }
+      };
+    }
+
+    async function sendToWhisper(blob) {
+      const formData = new FormData();
+      formData.append("file", blob, "audio.webm");
+
+      const res = await fetch("http://localhost:5000/transcribe", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      console.log("Whisper result:", data);
+      document.getElementById("status").innerText = `📝 טקסט מזוהה: ${data.text}`;
+    }
+
+    startVAD();
   </script>
 </body>
 </html>
