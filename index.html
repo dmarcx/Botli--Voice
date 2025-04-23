@@ -78,6 +78,11 @@ const isProbablySilence = (
   genericResponses.includes(text) ||
   normalized.length === 0 ||
   /^(תודה|thank)/i.test(text) ||
+  (normalized.length < 3 && !allowedShortWords.includes(normalized))
+  !text ||
+  genericResponses.includes(text) ||
+  normalized.length === 0 ||
+  /^(תודה|thank)/i.test(text) ||
   (normalized.length < 3 && !allowedShortWords.includes(text))
 );
 
