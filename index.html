@@ -1,66 +1,72 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he">
 <head>
-  <meta charset="UTF-8" />
-  <title>Botli - האזנה קבועה</title>
+  <meta charset="UTF-8">
+  <title>Botli - זיהוי קולי מתמשך</title>
   <style>
-    body { font-family: sans-serif; text-align: center; margin-top: 50px; direction: rtl; }
-    button { font-size: 18px; padding: 10px 20px; margin: 10px; }
-    #output { font-size: 20px; margin-top: 30px; color: #333; white-space: pre-wrap; }
+    body { font-family: Arial; direction: rtl; text-align: center; margin-top: 50px; }
+    button { font-size: 18px; margin: 10px; padding: 10px 20px; }
+    #result { margin-top: 30px; font-size: 20px; color: #333; }
   </style>
 </head>
 <body>
-  <h1>🎤 Botli - האזנה קבועה</h1>
-  <button onclick="startRecognition()">🚀 התחל</button>
-  <button onclick="stopRecognition()">🛑 עצור</button>
-  <div id="output">מוכן להאזנה...</div>
+  <h1>🎤 Botli - זיהוי קולי מתמשך</h1>
+  <button onclick="startRecognition()">התחל זיהוי</button>
+  <button onclick="stopRecognition()">עצור זיהוי</button>
+  <div id="result">תוצאה תוצג כאן</div>
 
   <script>
     let recognition;
     let keepListening = false;
+    let isRecognizing = false;
 
     function initRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        document.getElementById("result").innerText = "הדפדפן לא תומך בזיהוי קולי.";
+        return;
+      }
       recognition = new SpeechRecognition();
-      recognition.lang = 'he-IL';
-      recognition.continuous = true;
+      recognition.lang = "he-IL";
       recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
-        document.getElementById('output').textContent += "\\n🎧 מאזין...";
-      };
-
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript + ' ';
-        }
-        document.getElementById('output').textContent += "\\n🗣️ " + transcript.trim();
-      };
-
-      recognition.onerror = (event) => {
-        document.getElementById('output').textContent += "\\n⚠️ שגיאה: " + event.error;
+        isRecognizing = true;
       };
 
       recognition.onend = () => {
+        isRecognizing = false;
         if (keepListening) {
           setTimeout(() => {
             recognition.start();
-          }, 500); // מעט השהייה למניעת כפילות
+          }, 500);
         }
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("result").innerText = `תוצאה: ${transcript}`;
+      };
+
+      recognition.onerror = (event) => {
+        document.getElementById("result").innerText = `שגיאה: ${event.error}`;
       };
     }
 
     function startRecognition() {
       if (!recognition) initRecognition();
-      keepListening = true;
-      recognition.start();
+      if (!isRecognizing) {
+        keepListening = true;
+        recognition.start();
+      }
     }
 
     function stopRecognition() {
       keepListening = false;
-      if (recognition) recognition.stop();
-      document.getElementById('output').textContent += "\\n⏹️ הופסקה ההאזנה.";
+      if (recognition && isRecognizing) {
+        recognition.stop();
+      }
     }
   </script>
 </body>
