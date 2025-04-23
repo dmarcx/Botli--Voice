@@ -2,7 +2,7 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli - זיהוי קולי מתמשך</title>
+  <title>Botli - האזנה קבועה עם תגובה קולית</title>
   <style>
     body { font-family: sans-serif; direction: rtl; text-align: center; padding: 2em; }
     #output { white-space: pre-wrap; background: #f9f9f9; padding: 1em; margin-top: 1em; border-radius: 8px; }
@@ -10,10 +10,10 @@
   </style>
 </head>
 <body>
-  <h1>🎤 Botli - האזנה מתמשכת</h1>
+  <h1>🎤 Botli - האזנה קבועה עם תגובה קולית</h1>
   <button onclick="startRecognition()">🚀 התחל</button>
   <button onclick="stopRecognition()">⛔ עצור</button>
-  <div id="output">מוכן להתחיל האזנה...</div>
+  <div id="output">🎧 מוכן להאזנה...</div>
 
   <script>
     const output = document.getElementById("output");
@@ -23,31 +23,31 @@
     recognition.continuous = false;
 
     let isListening = false;
+    let isSpeaking = false;
 
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript.trim();
       output.innerHTML += `\n🎙️ ${text}`;
-      speak(text);
+      respond(text);
     };
 
     recognition.onend = () => {
-      if (isListening) {
-        output.innerHTML += "\n🔁 מאזין שוב...";
-        recognition.start(); // ריסט
+      if (isListening && !isSpeaking) {
+        recognition.start(); // המשך להאזין
       }
     };
 
     recognition.onerror = (event) => {
       output.innerHTML += `\n⚠️ שגיאה: ${event.error}`;
       if (isListening && event.error === "no-speech") {
-        setTimeout(() => recognition.start(), 500); // נסה שוב אחרי חצי שנייה
+        setTimeout(() => recognition.start(), 800);
       }
     };
 
     function startRecognition() {
       if (!isListening) {
         isListening = true;
-        output.innerHTML += "\n▶️ התחלה מחדש.";
+        output.innerHTML += "\n▶️ התחלה...";
         recognition.start();
       }
     }
@@ -58,15 +58,21 @@
       output.innerHTML += "\n⛔ הופסקה ההאזנה.";
     }
 
-    function speak(text) {
+    function respond(text) {
+      isSpeaking = true;
       const msg = new SpeechSynthesisUtterance(text);
       msg.lang = "he-IL";
+
       const voices = speechSynthesis.getVoices();
       const hebVoice = voices.find(v => v.lang === "he-IL");
       if (hebVoice) msg.voice = hebVoice;
-      msg.rate = 1;
-      msg.volume = 1;
-      speechSynthesis.cancel(); // תור קולי
+
+      msg.onend = () => {
+        isSpeaking = false;
+        if (isListening) recognition.start(); // חזרה להאזנה אחרי שדיברנו
+      };
+
+      speechSynthesis.cancel();
       speechSynthesis.speak(msg);
     }
 
