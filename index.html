@@ -2,90 +2,92 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli - האזנה מתמשכת</title>
+  <title>בדיקת זיהוי קול</title>
   <style>
-    body { font-family: Arial, sans-serif; direction: rtl; text-align: center; padding: 2em; }
-    #log { background: #f0f0f0; padding: 1em; border-radius: 10px; margin-top: 1em; white-space: pre-wrap; }
-    button { font-size: 1.2em; padding: 0.5em 1.5em; margin: 0.5em; }
+    body { font-family: Arial; text-align: center; margin-top: 50px; }
+    #levelBar {
+      width: 300px; height: 20px; background: #ddd;
+      margin: 10px auto; border-radius: 10px;
+      overflow: hidden; position: relative;
+    }
+    #level {
+      height: 100%; width: 0; background: green;
+      transition: width 0.1s linear;
+    }
+    #log { margin-top: 30px; font-size: 1.2em; }
   </style>
 </head>
 <body>
-  <h1>🎤 Botli - האזנה מתמשכת</h1>
-  <button onclick="startRecognition()">🚀 התחל</button>
-  <button onclick="stopRecognition()">⛔ עצור</button>
-  <div id="log">מוכן להתחיל האזנה...</div>
+  <h1>🎙️ זיהוי קול רציף עם מד עוצמה</h1>
+  <div id="levelBar"><div id="level"></div></div>
+  <button onclick="startListening()">התחל האזנה</button>
+  <button onclick="stopListening()">עצור</button>
+  <div id="log">מוכן להאזנה...</div>
 
   <script>
-    const logDiv = document.getElementById("log");
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "he-IL";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    let audioContext, analyser, microphone, javascriptNode;
+    let recognition, isRecognizing = false;
+    let silenceTimeout;
 
-    let isListening = false;
-    let isSpeaking = false;
+    function startListening() {
+      if (isRecognizing) return;
+      document.getElementById("log").textContent = "מאזין...";
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          microphone = audioContext.createMediaStreamSource(stream);
+          javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
 
-    function log(msg) {
-      logDiv.innerText += "\n" + msg;
+          analyser.smoothingTimeConstant = 0.8;
+          analyser.fftSize = 1024;
+
+          microphone.connect(analyser);
+          analyser.connect(javascriptNode);
+          javascriptNode.connect(audioContext.destination);
+
+          javascriptNode.onaudioprocess = () => {
+            const array = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(array);
+            const volume = array.reduce((a, b) => a + b) / array.length;
+            document.getElementById("level").style.width = Math.min(volume, 100) + "%";
+            if (volume > 20) triggerRecognition();
+          };
+        });
     }
 
-    function startRecognition() {
-      if (!isListening) {
-        isListening = true;
-        log("▶️ התחלה מחדש.");
-        recognition.start();
-      }
+    function stopListening() {
+      isRecognizing = false;
+      if (recognition) recognition.stop();
+      if (audioContext) audioContext.close();
+      document.getElementById("log").textContent = "נעצר";
     }
 
-    function stopRecognition() {
-      isListening = false;
-      recognition.stop();
-      log("⛔ הופסקה ההאזנה.");
-    }
+    function triggerRecognition() {
+      if (isRecognizing) return;
+      isRecognizing = true;
+      document.getElementById("log").textContent = "🎤 מזהה דיבור...";
 
-    recognition.onresult = (event) => {
-      if (isSpeaking) {
-        log("🔁 מדלג על תוצאה בזמן דיבור.");
-        return;
-      }
-      const text = event.results[0][0].transcript.trim();
-      log(`🎙️ ${text}`);
-      speak(text);
-    };
+      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'he-IL';
+      recognition.interimResults = false;
 
-    recognition.onend = () => {
-      if (isListening && !isSpeaking) {
-        recognition.start();
-        log("🔄 מאזין שוב...");
-      }
-    };
-
-    recognition.onerror = (event) => {
-      log(`⚠️ שגיאה: ${event.error}`);
-      if (isListening && event.error === "no-speech") {
-        setTimeout(() => recognition.start(), 800);
-      }
-    };
-
-    function speak(text) {
-      isSpeaking = true;
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = "he-IL";
-      msg.onend = () => {
-        isSpeaking = false;
-        if (isListening) recognition.start();
+      recognition.onresult = event => {
+        const text = event.results[0][0].transcript;
+        document.getElementById("log").textContent = "✅ זוהה: " + text;
       };
 
-      const voices = speechSynthesis.getVoices();
-      const hebVoice = voices.find(v => v.lang === "he-IL");
-      if (hebVoice) msg.voice = hebVoice;
+      recognition.onend = () => {
+        isRecognizing = false;
+        document.getElementById("log").textContent += " | מוכן להאזנה...";
+      };
 
-      speechSynthesis.cancel();  // לעצור דיבור קודם אם קיים
-      speechSynthesis.speak(msg);
-    }
+      recognition.onerror = () => {
+        isRecognizing = false;
+        document.getElementById("log").textContent = "❌ שגיאת זיהוי";
+      };
 
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = () => {};
+      recognition.start();
     }
   </script>
 </body>
