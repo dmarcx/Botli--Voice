@@ -72,12 +72,13 @@
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
 
-          const isProbablySilence = (
+          const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
+const isProbablySilence = (
   !text ||
   genericResponses.includes(text) ||
   normalized.length === 0 ||
   /^(תודה|thank)/i.test(text) ||
-  (normalized.length < 3 && !['כן','לא','מה'].includes(text))
+  (normalized.length < 3 && !allowedShortWords.includes(text))
 );
 
           if (isProbablySilence) {
