@@ -36,6 +36,14 @@
       mediaRecorder.onstop = async () => {
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         audioChunks = [];
+
+        // סינון שקטים או הקלטות קצרות מאוד
+        if (blob.size < 2000) {
+          document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
+          if (isRecording) startListening();
+          return;
+        }
+
         document.getElementById('status').textContent = "⬛ שולח ל-Whisper...";
 
         const formData = new FormData();
