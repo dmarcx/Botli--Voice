@@ -56,10 +56,17 @@
           const data = await res.json();
           const text = (data.text || '').trim();
 
-          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "", "Thank you", "Thanks"];
-          const normalized = text.replace(/[.,!?\s]/g, '').toLowerCase();
+          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
+          const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
 
-          if (!text || genericResponses.includes(text) || normalized.length < 3) {
+          const isProbablySilence = (
+            !text ||
+            genericResponses.includes(text) ||
+            normalized.length < 3 ||
+            /^(תודה|thank)/i.test(text)
+          );
+
+          if (isProbablySilence) {
             document.getElementById("transcription").textContent = "📝 טקסט מזוהה: (שקט או לא מזוהה)";
           } else {
             document.getElementById("transcription").textContent = "📝 טקסט מזוהה: " + text;
