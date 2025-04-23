@@ -75,9 +75,9 @@
           const isProbablySilence = (
   !text ||
   genericResponses.includes(text) ||
-  normalized.length < 3 ||
+  normalized.length === 0 ||
   /^(תודה|thank)/i.test(text) ||
-  !/[֐-׿a-zA-Z]{2,}/.test(text) // לא נמצאו אותיות בעברית או אנגלית בתבנית סבירה
+  (/[^֐-׿a-zA-Z]/.test(normalized) && normalized.length < 3)
 );
 
           if (isProbablySilence) {
