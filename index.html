@@ -110,7 +110,9 @@
           document.getElementById("status").textContent = "🔴 מקליט...";
           isRecording = true;
           recordStartTime = Date.now();
-          mediaRecorder.start();
+          if (mediaRecorder.state !== "recording") {
+            mediaRecorder.start();
+          }
         }
 
         if (isRecording && isSilent) {
@@ -119,7 +121,9 @@
             document.getElementById("status").textContent = "⬛ עוצר הקלטה...";
             isRecording = false;
             silenceCounter = 0;
-            mediaRecorder.stop();
+            if (mediaRecorder.state === "recording") {
+              mediaRecorder.stop();
+            }
           }
         } else if (!isSilent) {
           silenceCounter = 0;
@@ -129,7 +133,7 @@
 
     function startListening() {
       document.getElementById("status").textContent = "מאזין... (דבר רציפות)";
-      if (!isRecording) {
+      if (!isRecording && mediaRecorder.state !== "recording") {
         recordStartTime = 0;
         mediaRecorder.start();
         isRecording = true;
