@@ -71,7 +71,7 @@
 
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
-          const cleanNormalized = normalized;
+          const cleanNormalized = normalized.replace(/[^\p{L}\p{N}]/gu, '');
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
 
           console.log("text:", text);
@@ -92,7 +92,7 @@
             document.getElementById("transcription").textContent = "📝 טקסט מזוה: " + text;
           }
         } catch (e) {
-          document.getElementById("transcription").textContent = '[שגיאה בשלי9 לשרת]';
+          document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
         }
 
         isRecording = false;
