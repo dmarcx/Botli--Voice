@@ -81,10 +81,12 @@
           console.log("cleanNormalized:", cleanNormalized);
           console.log("RMS:", lastRMS);
 
+          const isGenericExact = genericResponses.includes(text.trim());
+
           const isProbablySilence = (
             !text ||
             cleanNormalized.length === 0 ||
-            ((cleanNormalized.startsWith("תודה") || genericResponses.includes(text.trim())) && lastRMS < 0.01 && cleanNormalized.length <= 10 && !allowedShortWords.includes(cleanNormalized)) ||
+            ((isGenericExact || cleanNormalized.startsWith("תודה")) && lastRMS < 0.005 && cleanNormalized.length <= 10 && !allowedShortWords.includes(cleanNormalized)) ||
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
