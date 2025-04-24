@@ -50,10 +50,58 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const context = new AudioContext();
       const source = context.createMediaStreamSource(stream);
-      const processor = context.createScriptProcessor(2048, 1, 1);
+      const processor = new AudioWorkletNode(context, 'rms-processor');
+      await context.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+        class RMSProcessor extends AudioWorkletProcessor {
+          constructor() {
+            super();
+            this._buffer = [];
+          }
+
+          process(inputs) {
+            const input = inputs[0][0];
+            if (!input) return true;
+            let sum = 0;
+            for (let i = 0; i < input.length; i++) {
+              sum += input[i] * input[i];
+            }
+            const rms = Math.sqrt(sum / input.length);
+            this.port.postMessage(rms);
+            return true;
+          }
+        }
+        registerProcessor('rms-processor', RMSProcessor);
+      `], { type: 'application/javascript' })));
 
       source.connect(processor);
       processor.connect(context.destination);
+
+      processor.port.onmessage = event => {
+        const rms = event.data;
+        recentRMS.push(rms);
+        if (recentRMS.length > 30) recentRMS.shift();
+
+        const isSilent = rms < silenceThreshold;
+
+        if (!isSilent && !isRecording) {
+          document.getElementById("status").textContent = "🔴 מקליט...";
+          isRecording = true;
+          recordStartTime = Date.now();
+          if (mediaRecorder.state !== "recording") mediaRecorder.start();
+        }
+
+        if (isRecording && isSilent) {
+          silenceCounter++;
+          if (silenceCounter > requiredSilenceFrames) {
+            document.getElementById("status").textContent = "⬛ עוצר הקלטה...";
+            isRecording = false;
+            silenceCounter = 0;
+            if (mediaRecorder.state === "recording") mediaRecorder.stop();
+          }
+        } else if (!isSilent) {
+          silenceCounter = 0;
+        }
+      };
 
       mediaRecorder = new MediaRecorder(stream);
       mediaRecorder.ondataavailable = (e) => {
@@ -123,34 +171,6 @@
 
         isRecording = false;
         startListening();
-      };
-
-      processor.onaudioprocess = e => {
-        const input = e.inputBuffer.getChannelData(0);
-        const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
-        recentRMS.push(rms);
-        if (recentRMS.length > 30) recentRMS.shift();
-
-        const isSilent = rms < silenceThreshold;
-
-        if (!isSilent && !isRecording) {
-          document.getElementById("status").textContent = "🔴 מקליט...";
-          isRecording = true;
-          recordStartTime = Date.now();
-          if (mediaRecorder.state !== "recording") mediaRecorder.start();
-        }
-
-        if (isRecording && isSilent) {
-          silenceCounter++;
-          if (silenceCounter > requiredSilenceFrames) {
-            document.getElementById("status").textContent = "⬛ עוצר הקלטה...";
-            isRecording = false;
-            silenceCounter = 0;
-            if (mediaRecorder.state === "recording") mediaRecorder.stop();
-          }
-        } else if (!isSilent) {
-          silenceCounter = 0;
-        }
       };
     }
 
