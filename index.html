@@ -8,6 +8,7 @@
     h1 { font-size: 28px; }
     #status, #transcription { font-size: 20px; margin-top: 20px; }
     button { margin-top: 30px; padding: 10px 20px; font-size: 16px; }
+    #log { white-space: pre-line; text-align: left; direction: ltr; margin-top: 20px; font-size: 14px; background: #f4f4f4; padding: 10px; max-height: 200px; overflow-y: auto; }
   </style>
 </head>
 <body>
@@ -15,6 +16,7 @@
   <div id="status">מאזין...</div>
   <div id="transcription">תוצאות יופיו כאן ויפורסמו</div>
   <button onclick="downloadTranscripts()">📥 הורד תמלול</button>
+  <div id="log"></div>
 
   <script>
     let mediaRecorder;
@@ -28,6 +30,12 @@
     let silenceThreshold = 0.01;
     let requiredSilenceFrames = 25; // 25 x 20ms ≈ 500ms
     let minRecordingDuration = 2500;
+
+    function logMessage(msg) {
+      const logEl = document.getElementById("log");
+      logEl.textContent += msg + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
 
     function downloadTranscripts() {
       const content = transcriptLog.map(entry => `${entry.time}: ${entry.text}`).join("\n");
@@ -59,6 +67,7 @@
 
         if (blob.size < 2000 || recordingDuration < minRecordingDuration) {
           document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או קצר מדי)";
+          logMessage("[SKIP] Blob too short or small");
           if (isRecording) startListening();
           return;
         }
@@ -94,6 +103,13 @@
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
+          logMessage("text: " + text);
+          logMessage("normalized: " + normalized);
+          logMessage("cleanNormalized: " + cleanNormalized);
+          logMessage("RMS: " + lastRMS);
+          logMessage("isGenericExact: " + isGenericExact);
+          logMessage("isProbablySilence: " + isProbablySilence);
+
           if (!isProbablySilence) {
             transcriptLog.push({ time: new Date().toISOString(), text });
           }
@@ -103,6 +119,7 @@
             : "📝 טקסט מזוה: " + text;
         } catch (e) {
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
+          logMessage("[ERROR] " + e.message);
         }
 
         isRecording = false;
