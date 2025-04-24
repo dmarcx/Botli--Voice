@@ -74,6 +74,8 @@
           const cleanNormalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
 
+          console.log("text:", text);
+          console.log("normalized:", normalized);
           console.log("cleanNormalized:", cleanNormalized);
 
           const isProbablySilence = (
@@ -81,7 +83,7 @@
             genericResponses.includes(text) ||
             normalized.length === 0 ||
             /^(תודה|thank)/i.test(normalized) ||
-            (normalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
+            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
           if (isProbablySilence) {
