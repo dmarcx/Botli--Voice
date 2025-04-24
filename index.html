@@ -19,7 +19,7 @@
 
   <script>
     let mediaRecorder, audioChunks = [], isRecording = false;
-    let audioContext, processor;
+    let audioContext, processor, inputStream;
     const lastTexts = [];
     const logEl = document.getElementById("log");
     const shortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
@@ -30,10 +30,10 @@
     };
 
     async function init() {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      inputStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      processor = audioContext.createScriptProcessor(2048, 1, 1);
+      const source = audioContext.createMediaStreamSource(inputStream);
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
       source.connect(processor);
       processor.connect(audioContext.destination);
 
@@ -42,7 +42,7 @@
         const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
         document.getElementById("status").textContent = `🎧 RMS: ${rms.toFixed(6)}`;
 
-        if (rms > 0.01 && !isRecording) startRecording();
+        if (rms > 0.008 && !isRecording) startRecording();
         if (rms < 0.003 && isRecording) stopRecording();
       };
       log('🎤 התחבר למיקרופון ומאזין.');
@@ -50,14 +50,12 @@
 
     function startRecording() {
       audioChunks = [];
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        mediaRecorder = new MediaRecorder(stream);
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = sendToWhisper;
-        mediaRecorder.start();
-        isRecording = true;
-        log('▶️ התחיל הקלטה');
-      });
+      mediaRecorder = new MediaRecorder(inputStream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = sendToWhisper;
+      mediaRecorder.start();
+      isRecording = true;
+      log('▶️ התחיל הקלטה');
     }
 
     function stopRecording() {
@@ -70,7 +68,7 @@
 
     async function sendToWhisper() {
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      if (blob.size < 1000) return log('[SKIP] Blob too short');
+      if (blob.size < 1500) return log('[SKIP] Blob too short');
 
       const form = new FormData();
       form.append('file', blob, 'audio.webm');
@@ -84,7 +82,7 @@
 
         const isDuplicate = lastTexts.slice(-5).includes(normalized);
         const isShort = normalized.length < 3 && !shortWords.includes(normalized);
-        const isGeneric = ['תודה', 'תודה רבה'].includes(text);
+        const isGeneric = /^(תודה|תודהרבה)$/i.test(normalized);
 
         log(`[${now}] text: ${text}\nnormalized: ${normalized}`);
 
