@@ -83,7 +83,7 @@
             normalized.length === 0 ||
             (/^(תודה|thank)/i.test(normalized) && !allowedShortWords.includes(cleanNormalized)) ||
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized)) ||
-            genericResponses.includes(text)
+            (genericResponses.includes(text) && !allowedShortWords.includes(cleanNormalized))
           );
 
           if (isProbablySilence) {
