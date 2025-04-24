@@ -82,7 +82,7 @@
             !text ||
             genericResponses.includes(text) ||
             normalized.length === 0 ||
-            /^(תודה|thank)/i.test(normalized) ||
+            (/^(תודה|thank)/i.test(normalized) && !allowedShortWords.includes(cleanNormalized)) ||
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
