@@ -71,7 +71,7 @@
 
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
-          const cleanNormalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
+          const cleanNormalized = normalized;
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
 
           console.log("text:", text);
@@ -80,8 +80,8 @@
 
           const isProbablySilence = (
             !text ||
-            normalized.length === 0 ||
-            (/^(תודה|thank)/i.test(normalized) && !allowedShortWords.includes(cleanNormalized)) ||
+            cleanNormalized.length === 0 ||
+            (/^(תודה|thank)/i.test(cleanNormalized) && !allowedShortWords.includes(cleanNormalized)) ||
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized)) ||
             (genericResponses.includes(text) && !allowedShortWords.includes(cleanNormalized))
           );
