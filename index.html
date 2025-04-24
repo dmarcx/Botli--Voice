@@ -84,7 +84,7 @@
           const isProbablySilence = (
             !text ||
             cleanNormalized.length === 0 ||
-            ((genericResponses.includes(text.trim()) || cleanNormalized.startsWith("תודה")) && lastRMS < 0.02 && cleanNormalized.length < 6 && !allowedShortWords.includes(cleanNormalized)) ||
+            ((genericResponses.includes(text.trim()) || cleanNormalized.startsWith("תודה")) && lastRMS < 0.005 && cleanNormalized.length < 7 && !allowedShortWords.includes(cleanNormalized)) ||
             (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
