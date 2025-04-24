@@ -69,9 +69,10 @@
             body: formData
           });
           const data = await res.json();
-          const text = (data.text || '').trim();
+          let text = (data.text || '').trim();
 
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
+          text = text.normalize("NFKC");
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
           const cleanNormalized = normalized.replace(/[^֐-׿a-zA-Z0-9]/gu, '');
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
@@ -81,7 +82,7 @@
           console.log("cleanNormalized:", cleanNormalized);
           console.log("RMS:", lastRMS);
 
-          const isGenericExact = genericResponses.includes(text.trim());
+          const isGenericExact = genericResponses.includes(text);
 
           const isProbablySilence = (
             !text ||
