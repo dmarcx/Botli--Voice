@@ -2,185 +2,116 @@
 <html lang="he">
 <head>
   <meta charset="UTF-8">
-  <title>Botli – האזנה רציפה ותמלול אוטומטי</title>
+  <title>Botli – עוזר קולי עם Whisper</title>
   <style>
-    body { font-family: sans-serif; direction: rtl; text-align: center; padding: 40px; }
-    h1 { font-size: 28px; }
-    #status, #transcription { font-size: 20px; margin-top: 20px; }
-    button { margin-top: 30px; padding: 10px 20px; font-size: 16px; }
-    #log { white-space: pre-line; text-align: left; direction: ltr; margin-top: 20px; font-size: 14px; background: #f4f4f4; padding: 10px; max-height: 200px; overflow-y: auto; }
+    body { font-family: sans-serif; direction: rtl; padding: 30px; text-align: center; }
+    #status, #transcription { margin-top: 20px; font-size: 18px; }
+    #log { text-align: left; direction: ltr; background: #f2f2f2; padding: 10px; margin-top: 20px; font-size: 14px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+    button { margin-top: 20px; font-size: 16px; padding: 8px 20px; }
   </style>
 </head>
 <body>
-  <h1>🎤 Botli – האזנה קולית רציפה ל-GPT</h1>
-  <div id="status">מאזין...</div>
-  <div id="transcription">תוצאות יופיו כאן ויפורסמו</div>
-  <button onclick="downloadTranscripts()">📅 הורד תמלול</button>
+  <h1>🎙️ Botli – זיהוי דיבור רציף</h1>
+  <div id="status">ממתין להתחלה...</div>
+  <div id="transcription">...</div>
+  <button onclick="downloadLog()">📥 הורד תמלול</button>
   <div id="log"></div>
 
   <script>
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
-    let recentRMS = [];
-    let lastRMS = 0;
-    let recordStartTime = 0;
-    let transcriptLog = [];
-    let silenceCounter = 0;
-    let silenceThreshold = 0.01;
-    let requiredSilenceFrames = 25;
-    let minRecordingDuration = 2500;
+    let mediaRecorder, audioChunks = [], isRecording = false;
+    let audioContext, processor;
+    const lastTexts = [];
+    const logEl = document.getElementById("log");
+    const shortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
 
-    function logMessage(msg) {
-      const logEl = document.getElementById("log");
-      logEl.textContent += msg + "\n";
-      logEl.scrollTop = logEl.scrollHeight;
-    }
+    const log = (msg) => {
+      console.log(msg);
+      logEl.textContent += `\n${msg}`;
+    };
 
-    function downloadTranscripts() {
-      const content = transcriptLog.map(entry => `${entry.time}: ${entry.text}`).join("\n");
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'transcripts.txt';
-      link.click();
-    }
-
-    async function initContinuousRecording() {
+    async function init() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const context = new AudioContext();
-      await context.audioWorklet.addModule(URL.createObjectURL(new Blob([`
-        class RMSProcessor extends AudioWorkletProcessor {
-          process(inputs) {
-            const input = inputs[0][0];
-            if (!input) return true;
-            let sum = 0;
-            for (let i = 0; i < input.length; i++) {
-              sum += input[i] * input[i];
-            }
-            const rms = Math.sqrt(sum / input.length);
-            this.port.postMessage(rms);
-            return true;
-          }
-        }
-        registerProcessor('rms-processor', RMSProcessor);
-      `], { type: 'application/javascript' })));
-
-      const source = context.createMediaStreamSource(stream);
-      const processor = new AudioWorkletNode(context, 'rms-processor');
-
+      audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      processor = audioContext.createScriptProcessor(2048, 1, 1);
       source.connect(processor);
-      processor.connect(context.destination);
+      processor.connect(audioContext.destination);
 
-      processor.port.onmessage = event => {
-        const rms = event.data;
-        recentRMS.push(rms);
-        if (recentRMS.length > 30) recentRMS.shift();
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
+        document.getElementById("status").textContent = `🎧 RMS: ${rms.toFixed(6)}`;
 
-        const isSilent = rms < silenceThreshold;
-
-        if (!isSilent && !isRecording) {
-          document.getElementById("status").textContent = "🔴 מקליט...";
-          isRecording = true;
-          recordStartTime = Date.now();
-          if (mediaRecorder.state !== "recording") mediaRecorder.start();
-        }
-
-        if (isRecording && isSilent) {
-          silenceCounter++;
-          if (silenceCounter > requiredSilenceFrames) {
-            document.getElementById("status").textContent = "⬛ עוצר הקלטה...";
-            isRecording = false;
-            silenceCounter = 0;
-            if (mediaRecorder.state === "recording") mediaRecorder.stop();
-          }
-        } else if (!isSilent) {
-          silenceCounter = 0;
-        }
+        if (rms > 0.01 && !isRecording) startRecording();
+        if (rms < 0.003 && isRecording) stopRecording();
       };
-
-      mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const recordingDuration = Date.now() - recordStartTime;
-        const blob = new Blob(audioChunks, { type: 'audio/webm' });
-        audioChunks = [];
-
-        if (blob.size < 2000 || recordingDuration < minRecordingDuration) {
-          document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או קצר מדי)";
-          logMessage("[SKIP] Blob too short or small");
-          if (isRecording) startListening();
-          return;
-        }
-
-        const averageRMS = recentRMS.reduce((a, b) => a + b, 0) / recentRMS.length;
-        lastRMS = averageRMS;
-        recentRMS = [];
-
-        document.getElementById('status').textContent = "⬛ שולח ל-Whisper...";
-
-        const formData = new FormData();
-        formData.append("file", blob, "audio.webm");
-
-        try {
-          const res = await fetch("http://localhost:5000/transcribe", {
-            method: "POST",
-            body: formData
-          });
-          const data = await res.json();
-          let text = (data.text || '').trim();
-
-          const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
-          text = text.normalize("NFKC");
-          const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
-          const cleanNormalized = normalized.replace(/[^֐-׿a-zA-Z0-9]/gu, '');
-          const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
-
-          const isGenericExact = genericResponses.includes(text);
-          const isProbablySilence = (
-            !text ||
-            cleanNormalized.length === 0 ||
-            ((isGenericExact || cleanNormalized.startsWith("תודה")) && lastRMS < 0.005 && cleanNormalized.length <= 10 && !allowedShortWords.includes(cleanNormalized)) ||
-            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
-          );
-
-          logMessage("text: " + text);
-          logMessage("normalized: " + normalized);
-          logMessage("cleanNormalized: " + cleanNormalized);
-          logMessage("RMS: " + lastRMS);
-          logMessage("isGenericExact: " + isGenericExact);
-          logMessage("isProbablySilence: " + isProbablySilence);
-
-          if (!isProbablySilence) {
-            transcriptLog.push({ time: new Date().toISOString(), text });
-            document.getElementById("transcription").textContent = "📝 טקסט מזוה: " + text;
-          } else {
-            document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או לא מזוה)";
-          }
-        } catch (e) {
-          document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
-          logMessage("[ERROR] " + e.message);
-        }
-
-        isRecording = false;
-        startListening();
-      };
+      log('🎤 התחבר למיקרופון ומאזין.');
     }
 
-    function startListening() {
-      document.getElementById("status").textContent = "מאזין... (דבר ברצף)";
-      if (!isRecording && mediaRecorder.state !== "recording") {
-        recordStartTime = 0;
+    function startRecording() {
+      audioChunks = [];
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = sendToWhisper;
         mediaRecorder.start();
         isRecording = true;
-        document.getElementById("status").textContent = "🔴 מקליט...";
+        log('▶️ התחיל הקלטה');
+      });
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+        log('⏹️ עצר הקלטה');
       }
     }
 
-    initContinuousRecording();
+    async function sendToWhisper() {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      if (blob.size < 1000) return log('[SKIP] Blob too short');
+
+      const form = new FormData();
+      form.append('file', blob, 'audio.webm');
+
+      try {
+        const res = await fetch('https://your-whisper-server.com/transcribe', { method: 'POST', body: form });
+        const data = await res.json();
+        const text = (data.text || '').trim();
+        const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
+        const now = new Date().toISOString().split('T')[1].slice(0, 8);
+
+        const isDuplicate = lastTexts.slice(-5).includes(normalized);
+        const isShort = normalized.length < 3 && !shortWords.includes(normalized);
+        const isGeneric = ['תודה', 'תודה רבה'].includes(text);
+
+        log(`[${now}] text: ${text}\nnormalized: ${normalized}`);
+
+        if (!text || isDuplicate || isShort || isGeneric) {
+          log(`[SKIP] ${text}`);
+          return;
+        }
+
+        lastTexts.push(normalized);
+        document.getElementById("transcription").textContent = "תמלול: " + text;
+        log('📝 ' + text);
+      } catch (err) {
+        log('❌ Whisper Error: ' + err.message);
+      }
+    }
+
+    function downloadLog() {
+      const blob = new Blob([logEl.textContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'botli_log.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    init();
   </script>
 </body>
 </html>
