@@ -19,6 +19,7 @@
     let audioChunks = [];
     let isRecording = false;
     let recentRMS = [];
+    let lastRMS = 0;
     let recordStartTime = 0;
 
     async function initContinuousRecording() {
@@ -47,6 +48,7 @@
         }
 
         const averageRMS = recentRMS.reduce((a, b) => a + b, 0) / recentRMS.length;
+        lastRMS = averageRMS;
         const stdDev = Math.sqrt(recentRMS.map(x => Math.pow(x - averageRMS, 2)).reduce((a, b) => a + b, 0) / recentRMS.length);
         recentRMS = [];
 
@@ -71,19 +73,19 @@
 
           const genericResponses = ["תודה", "תודה רבה", "שלום", "שלום לך", "Thank you", "Thanks"];
           const normalized = text.replace(/[.,!?־\s\u200f\u200e]/g, '').toLowerCase();
-          const cleanNormalized = normalized.replace(/[^\p{L}\p{N}]/gu, '');
+          const cleanNormalized = normalized.replace(/[^֐-׿a-zA-Z0-9]/gu, '');
           const allowedShortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
 
           console.log("text:", text);
           console.log("normalized:", normalized);
           console.log("cleanNormalized:", cleanNormalized);
+          console.log("RMS:", lastRMS);
 
           const isProbablySilence = (
             !text ||
             cleanNormalized.length === 0 ||
-            (/^(תודה|thank)/i.test(cleanNormalized) && !allowedShortWords.includes(cleanNormalized)) ||
-            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized)) ||
-            (genericResponses.includes(text) && !allowedShortWords.includes(cleanNormalized))
+            ((/^(תודה|thank)/i.test(cleanNormalized) || genericResponses.includes(text)) && lastRMS < 0.015 && !allowedShortWords.includes(cleanNormalized)) ||
+            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
           );
 
           if (isProbablySilence) {
