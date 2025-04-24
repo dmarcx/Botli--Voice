@@ -21,6 +21,7 @@
     let recentRMS = [];
     let lastRMS = 0;
     let recordStartTime = 0;
+    let transcriptLog = [];
 
     async function initContinuousRecording() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -98,6 +99,11 @@
           else if ((isGenericExact || cleanNormalized.startsWith("תודה")) && lastRMS < 0.005 && cleanNormalized.length <= 10) console.log("REASON: תודה עם RMS נמוך ותווך קצר");
           else if (cleanNormalized.length < 3) console.log("REASON: טקסט קצר מאוד");
           else console.log("PASSED FILTER – DISPLAYING TEXT");
+
+          if (!isProbablySilence) {
+            transcriptLog.push({ time: new Date().toISOString(), text });
+            console.log("Transcription log:", transcriptLog);
+          }
 
           if (isProbablySilence) {
             document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או לא מזוה)";
