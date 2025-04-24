@@ -15,7 +15,7 @@
   <h1>🎤 Botli – האזנה קולית רציפה ל-GPT</h1>
   <div id="status">מאזין...</div>
   <div id="transcription">תוצאות יופיו כאן ויפורסמו</div>
-  <button onclick="downloadTranscripts()">📥 הורד תמלול</button>
+  <button onclick="downloadTranscripts()">📅 הורד תמלול</button>
   <div id="log"></div>
 
   <script>
@@ -28,7 +28,7 @@
     let transcriptLog = [];
     let silenceCounter = 0;
     let silenceThreshold = 0.01;
-    let requiredSilenceFrames = 25; // 25 x 20ms ≈ 500ms
+    let requiredSilenceFrames = 25;
     let minRecordingDuration = 2500;
 
     function logMessage(msg) {
@@ -112,11 +112,10 @@
 
           if (!isProbablySilence) {
             transcriptLog.push({ time: new Date().toISOString(), text });
+            document.getElementById("transcription").textContent = "📝 טקסט מזוה: " + text;
+          } else {
+            document.getElementById("transcription").textContent = "📝 טקסט מזוה: (שקט או לא מזוה)";
           }
-
-          document.getElementById("transcription").textContent = isProbablySilence
-            ? "📝 טקסט מזוה: (שקט או לא מזוה)"
-            : "📝 טקסט מזוה: " + text;
         } catch (e) {
           document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
           logMessage("[ERROR] " + e.message);
