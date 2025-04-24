@@ -80,10 +80,10 @@
 
           const isProbablySilence = (
             !text ||
-            genericResponses.includes(text) ||
             normalized.length === 0 ||
             (/^(תודה|thank)/i.test(normalized) && !allowedShortWords.includes(cleanNormalized)) ||
-            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized))
+            (cleanNormalized.length < 3 && !allowedShortWords.includes(cleanNormalized)) ||
+            genericResponses.includes(text)
           );
 
           if (isProbablySilence) {
@@ -92,7 +92,7 @@
             document.getElementById("transcription").textContent = "📝 טקסט מזוה: " + text;
           }
         } catch (e) {
-          document.getElementById("transcription").textContent = '[שגיאה בשליחה לשרת]';
+          document.getElementById("transcription").textContent = '[שגיאה בשלי9 לשרת]';
         }
 
         isRecording = false;
