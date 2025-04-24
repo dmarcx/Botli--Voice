@@ -19,7 +19,7 @@
 
   <script>
     let mediaRecorder, audioChunks = [], isRecording = false;
-    let audioContext, processor, inputStream;
+    let audioContext, inputStream;
     const lastTexts = [];
     const logEl = document.getElementById("log");
     const shortWords = ['כן', 'לא', 'מה', 'מי', 'אי'];
@@ -30,22 +30,27 @@
     };
 
     async function init() {
-      inputStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(inputStream);
-      processor = audioContext.createScriptProcessor(4096, 1, 1);
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      try {
+        inputStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new AudioContext();
+        await audioContext.audioWorklet.addModule('rms-processor.js');
 
-      processor.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        const rms = Math.sqrt(input.reduce((sum, val) => sum + val * val, 0) / input.length);
-        document.getElementById("status").textContent = `🎧 RMS: ${rms.toFixed(6)}`;
+        const source = audioContext.createMediaStreamSource(inputStream);
+        const rmsNode = new AudioWorkletNode(audioContext, 'rms-processor');
 
-        if (rms > 0.008 && !isRecording) startRecording();
-        if (rms < 0.003 && isRecording) stopRecording();
-      };
-      log('🎤 התחבר למיקרופון ומאזין.');
+        rmsNode.port.onmessage = (event) => {
+          const rms = event.data.rms;
+          document.getElementById("status").textContent = `🎧 RMS: ${rms.toFixed(6)}`;
+
+          if (rms > 0.008 && !isRecording) startRecording();
+          if (rms < 0.003 && isRecording) stopRecording();
+        };
+
+        source.connect(rmsNode).connect(audioContext.destination);
+        log('🎤 התחבר למיקרופון ומאזין.');
+      } catch (err) {
+        log('❌ שגיאת התחברות: ' + err.message);
+      }
     }
 
     function startRecording() {
